@@ -20,7 +20,14 @@ app = typer.Typer(
 )
 
 # Shared type aliases for CLI parameters
-Tags = Annotated[list[str], typer.Argument(help="Tags to filter bookmarks by (AND logic).")]
+Tags = Annotated[
+    list[str],
+    typer.Argument(help="Tags to filter by (AND by default; --or matches any tag)."),
+]
+MatchAnyOpt = Annotated[
+    bool,
+    typer.Option("--or", help="Match any supplied tag instead of all tags (OR logic)."),
+]
 CollectionOpt = Annotated[
     int,
     typer.Option("--collection", "-c", help="Raindrop collection ID (0 = all)."),
@@ -50,13 +57,15 @@ def _resolve_urls_path() -> str:
 def fetch(
     tags: Tags,
     collection: CollectionOpt = 0,
+    match_any: MatchAnyOpt = False,
 ) -> None:
     """Fetch URLs from Raindrop.io by tag and save to urls.txt."""
     token = _get_token()
     urls_path = _resolve_urls_path()
 
-    typer.echo(f"Fetching bookmarks tagged: {', '.join(tags)}")
-    urls = fetch_all_urls(token, tags, collection_id=collection)
+    match_mode = "OR" if match_any else "AND"
+    typer.echo(f"Fetching bookmarks tagged ({match_mode}): {', '.join(tags)}")
+    urls = fetch_all_urls(token, tags, collection_id=collection, match_any=match_any)
 
     save_urls(urls, path=urls_path)
     typer.echo(f"Saved {len(urls)} URLs to {urls_path}")
@@ -70,13 +79,15 @@ def sync(
         Optional[str],
         typer.Option("--message", "-m", help="Custom git commit message."),
     ] = None,
+    match_any: MatchAnyOpt = False,
 ) -> None:
     """Fetch URLs from Raindrop.io, save to urls.txt, then commit and push."""
     token = _get_token()
     urls_path = _resolve_urls_path()
 
-    typer.echo(f"Fetching bookmarks tagged: {', '.join(tags)}")
-    urls = fetch_all_urls(token, tags, collection_id=collection)
+    match_mode = "OR" if match_any else "AND"
+    typer.echo(f"Fetching bookmarks tagged ({match_mode}): {', '.join(tags)}")
+    urls = fetch_all_urls(token, tags, collection_id=collection, match_any=match_any)
 
     save_urls(urls, path=urls_path)
     typer.echo(f"Saved {len(urls)} URLs to {urls_path}")

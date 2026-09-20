@@ -34,6 +34,18 @@ class TestBuildSearchQuery:
     def test_empty_tags(self):
         assert build_search_query([]) == ""
 
+    @pytest.mark.parametrize(
+        ("tags", "expected"),
+        [
+            (["python", "ai"], '#"python" #"ai" match:OR'),
+            (["python"], '#"python" match:OR'),
+            (["machine learning", "ai"], '#"machine learning" #"ai" match:OR'),
+            ([], ""),
+        ],
+    )
+    def test_match_any(self, tags, expected):
+        assert build_search_query(tags, match_any=True) == expected
+
 
 # ── save_urls ────────────────────────────────────────────────────────
 
@@ -84,8 +96,9 @@ class TestFetchAllUrls:
 
         assert result == urls
 
-    def test_pagination(self, httpx_mock):
-        """Fetches URLs across multiple pages."""
+    @pytest.mark.parametrize("match_any", [False, True])
+    def test_pagination(self, httpx_mock, match_any):
+        """Keep the selected tag matching mode on every page."""
         # First page: full page of results
         page1_urls = [f"https://example.com/{i}" for i in range(PER_PAGE)]
         httpx_mock.add_response(json=_make_raindrop_response(page1_urls))
@@ -94,10 +107,16 @@ class TestFetchAllUrls:
         page2_urls = [f"https://example.com/{PER_PAGE + i}" for i in range(5)]
         httpx_mock.add_response(json=_make_raindrop_response(page2_urls))
 
-        result = fetch_all_urls("test-token", ["python"])
+        result = fetch_all_urls("test-token", ["python", "ai"], match_any=match_any)
 
         assert len(result) == PER_PAGE + 5
         assert result == page1_urls + page2_urls
+        expected_search = '#"python" #"ai"' + (" match:OR" if match_any else "")
+        requests = httpx_mock.get_requests()
+        assert len(requests) == 2
+        for page, request in enumerate(requests):
+            assert request.url.params["search"] == expected_search
+            assert request.url.params["page"] == str(page)
 
     def test_empty_results(self, httpx_mock):
         """Returns empty list when no bookmarks match."""
@@ -124,7 +143,7 @@ class TestFetchAllUrls:
 
         request = httpx_mock.get_request()
         assert request.url.path == "/rest/v1/raindrops/42"
-        assert '#"python" #"ai"' in str(request.url.params.get("search"))
+        assert request.url.params["search"] == '#"python" #"ai"'
 
     def test_api_error_raises(self, httpx_mock):
         """Raises on non-2xx API responses."""

@@ -28,15 +28,29 @@ uv run unread-articles fetch python
 # Multiple tags (AND logic — bookmarks must match all)
 uv run unread-articles fetch python ai
 
+# Match any supplied tag (OR logic)
+uv run unread-articles fetch python ai --or
+
+# Quote tags that contain spaces
+uv run unread-articles fetch "machine learning" ai --or
+
 # Fetch from a specific collection (default: 0 = all)
 uv run unread-articles fetch python -c 12345678
 
 # Fetch + commit + push in one step
 uv run unread-articles sync python
 
+# Fetch bookmarks matching either tag, then commit and push
+uv run unread-articles sync python ai --or
+
 # With a custom commit message
 uv run unread-articles sync python -m "add python articles"
 ```
+
+Both commands require at least one tag and use AND matching by default. Add
+`--or` to match any supplied tag; it also works with `--collection` / `-c` and
+the sync command's `--message` / `-m` option. The progress output shows the
+selected matching mode. A single tag matches the same bookmarks in either mode.
 
 ## GitHub Pages Setup
 
